@@ -1,5 +1,14 @@
-import json
+import os
 from neo4j import GraphDatabase
+
+# --- Neo4j Configuration ---
+NEO4J_URL = "bolt://localhost:7687"
+NEO4J_USERNAME = "neo4j"
+NEO4J_DATABASE = "graphmatching"
+if os.environ.get("NEO4J_PASSWORD"):
+    NEO4J_AUTH = (NEO4J_USERNAME, os.environ.get("NEO4J_PASSWORD"))
+else:
+    print("Warning: NEO4J_PASSWORD environment variable is not set.")
 
 
 def create_detection_graph(nodes_list, edges_list, graph_id, graph_prefix, node_techniques, edge_pairs):
@@ -41,37 +50,6 @@ def create_detection_graph(nodes_list, edges_list, graph_id, graph_prefix, node_
         edges_list.append(edge)
 
 
-driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "<password>"))
-nodes, edges = [], []
-# --- Create detection graph 1 ---
-# All 3 nodes exist in the reference graph.
-create_detection_graph(
-    nodes_list=nodes,
-    edges_list=edges,
-    graph_id="d3_3_3",
-    graph_prefix="d3",
-    node_techniques=[
-        'T1566.001',  # Phishing: Spearphishing Attachment
-        'T1059.001',  # Command and Scripting Interpreter: PowerShell
-        'T1573',      # Encrypted Channel
-    ],
-    edge_pairs=[(0, 1), (1, 2)]
-)
-# --- Create detection graph 2 ---
-# None of the nodes exist in the reference graph.
-# create_detection_graph(
-#     nodes_list=nodes,
-#     edges_list=edges,
-#     graph_id="d_3_0",
-#     graph_prefix="d2",
-#     node_techniques=[
-#         'T1078.002',  # Valid Accounts: Domain Accounts
-#         'T1133',      # External Remote Services
-#         'T1071.001',  # Application Layer Protocol: Web Protocols
-#     ],
-#     edge_pairs=[(0, 1), (1, 2)]
-# )
-
 # Neo4j import
 def import_graph(tx, nodes, edges):
     for node in nodes:
@@ -88,7 +66,55 @@ def import_graph(tx, nodes, edges):
             id=edge.get("id"), type=edge.get("type"), graph_id=edge.get("graph_id"), source=edge.get("source"), target=edge.get("target")
         )
 
-with driver.session(database="graphmatching") as session:
+
+driver = GraphDatabase.driver(NEO4J_URL, auth=NEO4J_AUTH, database=NEO4J_DATABASE)
+nodes, edges = [], []
+
+# --- Create detection graph 1 ---
+# All 3 nodes exist in the reference graph.
+create_detection_graph(
+    nodes_list=nodes,
+    edges_list=edges,
+    graph_id="d1_3_3",
+    graph_prefix="d1",
+    node_techniques=[
+        'T1566.001',  # Phishing: Spearphishing Attachment
+        'T1059.001',  # Command and Scripting Interpreter: PowerShell
+        'T1573',      # Encrypted Channel
+    ],
+    edge_pairs=[(0, 1), (1, 2)]
+)
+# --- Create detection graph 2 ---
+# Duplicate of detection graph 1
+create_detection_graph(
+    nodes_list=nodes,
+    edges_list=edges,
+    graph_id="d2_3_3",
+    graph_prefix="d2",
+    node_techniques=[
+        'T1566.001',  # Phishing: Spearphishing Attachment
+        'T1059.001',  # Command and Scripting Interpreter: PowerShell
+        'T1573',      # Encrypted Channel
+    ],
+    edge_pairs=[(0, 1), (1, 2)]
+)
+# --- Create detection graph 3 ---
+# None of the nodes exist in the reference graph.
+create_detection_graph(
+    nodes_list=nodes,
+    edges_list=edges,
+    graph_id="d3_3_0",
+    graph_prefix="d3",
+    node_techniques=[
+        'T1078.002',  # Valid Accounts: Domain Accounts
+        'T1133',      # External Remote Services
+        'T1071.001',  # Application Layer Protocol: Web Protocols
+    ],
+    edge_pairs=[(0, 1), (1, 2)]
+)
+
+
+with driver.session(database=NEO4J_DATABASE) as session:
     session.execute_write(import_graph, nodes, edges)
 
 print(f"Imported {len(nodes)} nodes and {len(edges)} edges into Neo4j.")

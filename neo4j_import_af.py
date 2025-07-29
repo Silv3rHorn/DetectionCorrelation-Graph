@@ -1,14 +1,16 @@
-
 import json
-import sys
 import argparse
+import os
 from neo4j import GraphDatabase
 
 # --- Neo4j Configuration ---
 NEO4J_URL = "bolt://localhost:7687"
 NEO4J_USERNAME = "neo4j"
-NEO4J_PASSWORD = "<password>"
 NEO4J_DATABASE = "graphmatching"
+if os.environ.get("NEO4J_PASSWORD"):
+    NEO4J_AUTH = (NEO4J_USERNAME, os.environ.get("NEO4J_PASSWORD"))
+else:
+    print("Warning: NEO4J_PASSWORD environment variable is not set.")
 
 
 def flatten_properties(properties):
@@ -77,9 +79,7 @@ def main():
     with open(args.input, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    driver = GraphDatabase.driver(
-        NEO4J_URL, auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
-    )
+    driver = GraphDatabase.driver(NEO4J_URL, auth=NEO4J_AUTH, database=NEO4J_DATABASE)
 
     # build lookup tables to store latches-anchor and anchors-node mapping
     latches_to_anchor, anchors_to_node = {}, {}
